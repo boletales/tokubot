@@ -2,7 +2,7 @@
 
 import * as util from 'util';
 
-import { Client, GatewayIntentBits, Message, Events, Collection, Interaction, SlashCommandBuilder, CommandInteraction, Guild, GuildBasedChannel, PermissionFlagsBits, Partials, PartialMessage, User, Snowflake } from 'discord.js';
+import { Client, GatewayIntentBits, Message, Events, Collection, Interaction, SlashCommandBuilder, CommandInteraction, Guild, GuildBasedChannel, PermissionFlagsBits, Partials, PartialMessage, User, Snowflake, PermissionsBitField } from 'discord.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -14,6 +14,9 @@ function main() {
   new Bot(profile);
 }
 
+function hasSendPermission(bitfield: PermissionsBitField): Boolean{
+  return bitfield.has(PermissionFlagsBits.ViewChannel) && bitfield.has(PermissionFlagsBits.SendMessages);
+}
 
 class Bot {
   config: Config;
@@ -90,7 +93,7 @@ class Bot {
     }
     let guild = channel.guild;
     let member = await guild.members.fetch(author.id);
-    if (!member?.permissionsIn(channel).has(PermissionFlagsBits.SendMessages)) {
+    if (!hasSendPermission(member.permissionsIn(channel))) {
       author.send('メッセージ送信権限がありません').catch(console.error);
       return;
     }
