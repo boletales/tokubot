@@ -80,7 +80,10 @@ class Bot {
     if (!message.channel.isDMBased()) {
       return;
     }
-    this.deleteMessageByOriginalId(message.id, message.author?.id ?? "_").then((result)=>{}).catch(console.error);
+    if(message.author == null){
+      return;
+    }
+    this.deleteMessageByOriginalId(message.id, message.author).then((result)=>{}).catch(console.error);
   }
 
 
@@ -101,12 +104,14 @@ class Bot {
     this.DB.addMessage(original_id, data.id, author.id, message);
   }
 
-  async deleteMessageByOriginalId(original_id: string, author_id: string){
+  async deleteMessageByOriginalId(original_id: string, author: User): Promise<DeleteResult>{
     let data = await this.DB.getMessageByOriginalId(original_id);
     if (data.length == 0) {
+      author.send(messageDeleteResult(DeleteResult.NOT_EXIST)).catch(console.error);
       return DeleteResult.NOT_EXIST;
     }
-    if (data[0].author_id != author_id) {
+    if (data[0].author_id != author.id) {
+      author.send(messageDeleteResult(DeleteResult.NOT_OWNER)).catch(console.error);
       return DeleteResult.NOT_OWNER;
     }
 
@@ -114,12 +119,13 @@ class Bot {
     let channel = this.client.channels.resolve(this.config.channel);
     if (!channel || !channel.isTextBased() || channel.isDMBased()) {
       console.error('channel not found');
-      return;
+      return DeleteResult.FAILED;
     }
     
     let message = await channel.messages.fetch(data[0].message_id);
     await message.delete();
-    await this.DB.removeMessageByOriginalId(original_id, author_id);
+    await this.DB.removeMessageByOriginalId(original_id, author.id);
+    return DeleteResult.SUCCESS;
   }
 }
 
