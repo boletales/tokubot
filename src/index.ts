@@ -122,7 +122,11 @@ class Bot {
       return DeleteResult.FAILED;
     }
     
-    let message = await channel.messages.fetch(data[0].message_id);
+    let message = await channel.messages.fetch(data[0].message_id).catch(console.error);
+    if (!message) {
+      author.send(messageDeleteResult(DeleteResult.NOT_EXIST)).catch(console.error);
+      return DeleteResult.NOT_EXIST;
+    }
     await message.delete();
     await this.DB.removeMessageByOriginalId(original_id, author.id);
     return DeleteResult.SUCCESS;
