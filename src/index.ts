@@ -76,14 +76,19 @@ class Bot {
     this.trySendMessage(message.id, message.content, message.author).catch(console.error).then();
   }
 
-  onMessageDelete(message: Message | PartialMessage){
+  async onMessageDelete(message: Message | PartialMessage){
     if (!message.channel.isDMBased()) {
       return;
     }
-    if(message.channel.recipient == null){
+    
+    let channel = await this.client.channels.fetch(message.channel.id, {force: true});
+    if (channel == null || !channel.isDMBased() || !channel.partial) {
       return;
     }
-    this.deleteMessageByOriginalId(message.id, message.channel.recipient).then((result)=>{}).catch(console.error);
+    if(channel.recipient == null){
+      return;
+    }
+    this.deleteMessageByOriginalId(message.id, channel.recipient).then((result)=>{}).catch(console.error);
   }
 
 
