@@ -2,7 +2,7 @@
 
 import * as util from 'util';
 
-import { Client, GatewayIntentBits, Message, Events, Collection, Interaction, SlashCommandBuilder, CommandInteraction, Guild, GuildBasedChannel, PermissionFlagsBits, Partials, PartialMessage, User, Snowflake, PermissionsBitField } from 'discord.js';
+import { Client, GatewayIntentBits, Message, Events, Collection, Interaction, SlashCommandBuilder, CommandInteraction, Guild, GuildBasedChannel, PermissionFlagsBits, Partials, PartialMessage, User, Snowflake, PermissionsBitField, ChannelType } from 'discord.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -82,7 +82,7 @@ class Bot {
     }
     
     let channel = await this.client.channels.fetch(message.channel.id, {force: true});
-    if (channel == null || !channel.isDMBased() || !channel.partial) {
+    if (channel == null || channel.type != ChannelType.DM) {
       return;
     }
     if(channel.recipient == null){
