@@ -80,10 +80,10 @@ class Bot {
     if (!message.channel.isDMBased()) {
       return;
     }
-    if(message.author == null){
+    if(message.channel.recipient == null){
       return;
     }
-    this.deleteMessageByOriginalId(message.id, message.author).then((result)=>{}).catch(console.error);
+    this.deleteMessageByOriginalId(message.id, message.channel.recipient).then((result)=>{}).catch(console.error);
   }
 
 
@@ -91,13 +91,13 @@ class Bot {
   async trySendMessage(original_id: Snowflake, message: string, author: User){
     let channel = await this.client.channels.fetch(this.config.channel);
     if (!channel || !channel.isTextBased() || channel.isDMBased()) {
-      author.send('送信先チャンネルが見つかりませんでした').catch(console.error);
+      author.send('送信先チャンネルが見つかりませんでした');
       return;
     }
     let guild = channel.guild;
     let member = await guild.members.fetch(author.id);
     if (!hasSendPermission(member.permissionsIn(channel))) {
-      author.send('メッセージ送信権限がありません').catch(console.error);
+      author.send('メッセージ送信権限がありません');
       return;
     }
     let data = await channel.send(message);
