@@ -112,8 +112,8 @@ class Bot {
   async deleteMessageByOriginalId(original_id: string, author: User): Promise<DeleteResult>{
     let data = await this.DB.getMessageByOriginalId(original_id);
     if (data.length == 0) {
-      author.send(messageDeleteResult(DeleteResult.NOT_EXIST)).catch(console.error);
-      return DeleteResult.NOT_EXIST;
+      author.send(messageDeleteResult(DeleteResult.NOT_EXIST_DB)).catch(console.error);
+      return DeleteResult.NOT_EXIST_DB;
     }
     if (data[0].author_id != author.id) {
       author.send(messageDeleteResult(DeleteResult.NOT_OWNER)).catch(console.error);
@@ -127,7 +127,7 @@ class Bot {
       return DeleteResult.FAILED;
     }
     
-    let message = await channel.messages.fetch(data[0].message_id).catch(console.error);
+    let message = await channel.messages.fetch({message: data[0].message_id, force: true}).catch(console.error);
     if (!message) {
       author.send(messageDeleteResult(DeleteResult.NOT_EXIST)).catch(console.error);
       return DeleteResult.NOT_EXIST;
@@ -191,7 +191,8 @@ const DeleteResult = {
   SUCCESS: 0,
   NOT_EXIST: 1,
   NOT_OWNER: 2,
-  FAILED: 3
+  FAILED: 3,
+  NOT_EXIST_DB: 4,
 } as const;
 type DeleteResult = typeof DeleteResult[keyof typeof DeleteResult];
 
@@ -201,6 +202,8 @@ function messageDeleteResult(err: DeleteResult): string{
       return 'メッセージを削除しました';
     case DeleteResult.NOT_EXIST:
       return 'メッセージが見つかりません';
+    case DeleteResult.NOT_EXIST_DB:
+      return 'DBにメッセージがありません';
     case DeleteResult.NOT_OWNER:
       return 'あなたは送信者ではありません';
     default:
