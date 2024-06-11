@@ -105,7 +105,7 @@ class Bot {
       author.send('メッセージ送信権限がありません');
       return;
     }
-    let data = await channel.send(message);
+    let data = await channel.send(message).then(m => m.fetch(true));
     this.DB.addMessage(original_id, data.id, author.id, message);
   }
 
