@@ -4,7 +4,6 @@
           "name": "tokubot",
           "script": "./dist/index.js",
           "instances": 1,
-          "watch": ["dist"],
           "exec_mode": "cluster",
           "source_map_support": true
       }
