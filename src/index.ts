@@ -2,7 +2,7 @@
 
 import * as util from 'util';
 
-import { Client, GatewayIntentBits, Message, Events, Collection, Interaction, SlashCommandBuilder, CommandInteraction, Guild, GuildBasedChannel, PermissionFlagsBits, Partials, PartialMessage, User, Snowflake } from 'discord.js';
+import { Client, GatewayIntentBits, Message, Events, Collection, Interaction, SlashCommandBuilder, CommandInteraction, Guild, GuildBasedChannel, PermissionFlagsBits, Partials, PartialMessage, User, Snowflake, PermissionsBitField, ChannelType } from 'discord.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -14,6 +14,9 @@ function main() {
   new Bot(profile);
 }
 
+function hasSendPermission(bitfield: PermissionsBitField): Boolean{
+  return bitfield.has(PermissionFlagsBits.ViewChannel) && bitfield.has(PermissionFlagsBits.SendMessages);
+}
 
 class Bot {
   config: Config;
@@ -73,11 +76,19 @@ class Bot {
     this.trySendMessage(message.id, message.content, message.author).catch(console.error).then();
   }
 
-  onMessageDelete(message: Message | PartialMessage){
+  async onMessageDelete(message: Message | PartialMessage){
     if (!message.channel.isDMBased()) {
       return;
     }
-    this.deleteMessageByOriginalId(message.id, message.author?.id ?? "_").then((result)=>{}).catch(console.error);
+    
+    let channel = await this.client.channels.fetch(message.channel.id, {force: true});
+    if (channel == null || channel.type != ChannelType.DM) {
+      return;
+    }
+    if(channel.recipient == null){
+      return;
+    }
+    this.deleteMessageByOriginalId(message.id, channel.recipient).then((result)=>{}).catch(console.error);
   }
 
 
@@ -85,25 +96,27 @@ class Bot {
   async trySendMessage(original_id: Snowflake, message: string, author: User){
     let channel = await this.client.channels.fetch(this.config.channel);
     if (!channel || !channel.isTextBased() || channel.isDMBased()) {
-      author.send('送信先チャンネルが見つかりませんでした').catch(console.error);
+      author.send('送信先チャンネルが見つかりませんでした');
       return;
     }
     let guild = channel.guild;
     let member = await guild.members.fetch(author.id);
-    if (!member?.permissionsIn(channel).has(PermissionFlagsBits.SendMessages)) {
-      author.send('メッセージ送信権限がありません').catch(console.error);
+    if (!hasSendPermission(member.permissionsIn(channel))) {
+      author.send('メッセージ送信権限がありません');
       return;
     }
-    let data = await channel.send(message);
+    let data = await channel.send(message).then(m => m.fetch(true));
     this.DB.addMessage(original_id, data.id, author.id, message);
   }
 
-  async deleteMessageByOriginalId(original_id: string, author_id: string){
+  async deleteMessageByOriginalId(original_id: string, author: User): Promise<DeleteResult>{
     let data = await this.DB.getMessageByOriginalId(original_id);
     if (data.length == 0) {
-      return DeleteResult.NOT_EXIST;
+      author.send(messageDeleteResult(DeleteResult.NOT_EXIST_DB)).catch(console.error);
+      return DeleteResult.NOT_EXIST_DB;
     }
-    if (data[0].author_id != author_id) {
+    if (data[0].author_id != author.id) {
+      author.send(messageDeleteResult(DeleteResult.NOT_OWNER)).catch(console.error);
       return DeleteResult.NOT_OWNER;
     }
 
@@ -111,12 +124,17 @@ class Bot {
     let channel = this.client.channels.resolve(this.config.channel);
     if (!channel || !channel.isTextBased() || channel.isDMBased()) {
       console.error('channel not found');
-      return;
+      return DeleteResult.FAILED;
     }
     
-    let message = await channel.messages.fetch(data[0].message_id);
+    let message = await channel.messages.fetch({message: data[0].message_id, force: true}).catch(console.error);
+    if (!message) {
+      author.send(messageDeleteResult(DeleteResult.NOT_EXIST)).catch(console.error);
+      return DeleteResult.NOT_EXIST;
+    }
     await message.delete();
-    await this.DB.removeMessageByOriginalId(original_id, author_id);
+    await this.DB.removeMessageByOriginalId(original_id, author.id);
+    return DeleteResult.SUCCESS;
   }
 }
 
@@ -173,7 +191,8 @@ const DeleteResult = {
   SUCCESS: 0,
   NOT_EXIST: 1,
   NOT_OWNER: 2,
-  FAILED: 3
+  FAILED: 3,
+  NOT_EXIST_DB: 4,
 } as const;
 type DeleteResult = typeof DeleteResult[keyof typeof DeleteResult];
 
@@ -183,6 +202,8 @@ function messageDeleteResult(err: DeleteResult): string{
       return 'メッセージを削除しました';
     case DeleteResult.NOT_EXIST:
       return 'メッセージが見つかりません';
+    case DeleteResult.NOT_EXIST_DB:
+      return 'DBにメッセージがありません';
     case DeleteResult.NOT_OWNER:
       return 'あなたは送信者ではありません';
     default:

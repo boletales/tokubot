@@ -6,7 +6,11 @@
           "instances": 1,
           "watch": ["dist"],
           "exec_mode": "cluster",
-          "source_map_support": true
+          "source_map_support": true,
+          "ignore_watch": [
+              "*.sqlite",
+              "src"
+          ]
       }
   ]
 }
