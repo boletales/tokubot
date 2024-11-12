@@ -2,7 +2,7 @@
 
 import * as util from 'util';
 
-import { Client, GatewayIntentBits, Message, Events, Collection, Interaction, SlashCommandBuilder, CommandInteraction, Guild, GuildBasedChannel, PermissionFlagsBits, Partials, PartialMessage, User, Snowflake, PermissionsBitField, ChannelType } from 'discord.js';
+import { Client, GatewayIntentBits, Message, Events, Collection, Interaction, SlashCommandBuilder, CommandInteraction, Guild, GuildBasedChannel, PermissionFlagsBits, Partials, PartialMessage, User, Snowflake, PermissionsBitField, ChannelType, Attachment, MessagePayload } from 'discord.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -73,7 +73,7 @@ class Bot {
     if (!message.channel.isDMBased()) {
       return;
     }
-    this.trySendMessage(message.id, message.content, message.author).catch(console.error).then();
+    this.trySendMessage(message.id, message.content, message.author, message.attachments).catch(console.error).then();
   }
 
   async onMessageDelete(message: Message | PartialMessage){
@@ -93,7 +93,7 @@ class Bot {
 
 
 
-  async trySendMessage(original_id: Snowflake, message: string, author: User){
+  async trySendMessage(original_id: Snowflake, message: string, author: User, media: Collection<String, Attachment>){
     let channel = await this.client.channels.fetch(this.config.channel);
     if (!channel || !channel.isTextBased() || channel.isDMBased()) {
       author.send('送信先チャンネルが見つかりませんでした');
@@ -105,7 +105,10 @@ class Bot {
       author.send('メッセージ送信権限がありません');
       return;
     }
-    let data = await channel.send(message).then(m => m.fetch(true));
+    let data = await channel.send({
+      content: message,
+      files: media.map((attachment)=>attachment.url),
+    }).then(m => m.fetch(true));
     this.DB.addMessage(original_id, data.id, author.id, message);
   }
 
