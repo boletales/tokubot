@@ -4,13 +4,8 @@
           "name": "tokubot",
           "script": "./dist/index.js",
           "instances": 1,
-          "watch": true,
           "exec_mode": "cluster",
-          "source_map_support": true,
-          "ignore_watch": [
-              "*.sqlite",
-              "src"
-          ]
+          "source_map_support": true
       }
   ]
 }
