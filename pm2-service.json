@@ -2,7 +2,7 @@
   "apps": [
       {
           "name": "tokubot",
-          "script": "tsc && ./dist/index.js",
+          "script": "src/index.ts",
           "instances": 1,
           "exec_mode": "cluster",
           "source_map_support": true
