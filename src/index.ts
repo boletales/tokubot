@@ -63,6 +63,10 @@ class Bot {
       this.onMessageDelete(message);
     });
 
+    this.client.on(Events.MessageUpdate, (oldMessage, newMessage) => {
+      this.onMessageUpdate(oldMessage, newMessage);
+    });
+
     this.client.login(this.config.token);
   }
 
@@ -91,7 +95,20 @@ class Bot {
     this.deleteMessageByOriginalId(message.id, channel.recipient).then((result)=>{}).catch(console.error);
   }
 
+  async onMessageUpdate(oldMessage: Message | PartialMessage, newMessage: Message | PartialMessage){
+    if (!oldMessage.channel.isDMBased()) {
+      return;
+    }
 
+    let channel = await this.client.channels.fetch(oldMessage.channel.id, {force: true});
+    if (channel == null || channel.type != ChannelType.DM) {
+      return;
+    }
+    if(channel.recipient == null){
+      return;
+    }
+    this.updateMessageByOriginalId(oldMessage.id, cutNull(newMessage.content), channel.recipient, newMessage.attachments).catch(console.error).then();
+  }
 
   async trySendMessage(original_id: Snowflake, message: string, author: User, media: Collection<String, Attachment>){
     let channel = await this.client.channels.fetch(this.config.channel);
@@ -139,6 +156,39 @@ class Bot {
     await this.DB.removeMessageByOriginalId(original_id, author.id);
     return DeleteResult.SUCCESS;
   }
+
+  async updateMessageByOriginalId(original_id: string, new_message: string, author: User, media: Collection<String, Attachment>){
+    let data = await this.DB.getMessageByOriginalId(original_id);
+    if (data.length == 0) {
+      author.send(messageUpdateResult(DeleteResult.NOT_EXIST_DB)).catch(console.error);
+      return DeleteResult.NOT_EXIST_DB;
+    }
+    if (data[0].author_id != author.id) {
+      author.send(messageUpdateResult(DeleteResult.NOT_OWNER)).catch(console.error);
+      return DeleteResult.NOT_OWNER;
+    }
+
+    
+    let channel = this.client.channels.resolve(this.config.channel);
+    if (!channel || !channel.isTextBased() || channel.isDMBased()) {
+      console.error('channel not found');
+      return DeleteResult.FAILED;
+    }
+    
+    let message = await channel.messages.fetch({message: data[0].message_id, force: true}).catch(console.error);
+    if (!message) {
+      author.send(messageDeleteResult(DeleteResult.NOT_EXIST)).catch(console.error);
+      return DeleteResult.NOT_EXIST;
+    }
+
+    await message.edit({
+      content: new_message,
+      files: media.map((attachment)=>attachment.url),
+    }).then(m => m.fetch(true));
+
+    await this.DB.updateMessageByOriginalId(original_id, new_message, author.id);
+    return DeleteResult.SUCCESS;
+  }
 }
 
 
@@ -152,6 +202,10 @@ function pathConfig(profile: string): string{
 
 function pathDB(profile: string): string{
   return path.join(profileDir(profile), 'db.sqlite');
+}
+
+function cutNull(str: string | null): string{
+  return str === null ? "" : str;
 }
 
 class Config {
@@ -214,6 +268,21 @@ function messageDeleteResult(err: DeleteResult): string{
   }
 }
 
+function messageUpdateResult(err: DeleteResult): string{
+  switch (err) {
+    case DeleteResult.SUCCESS:
+      return 'メッセージを更新しました';
+    case DeleteResult.NOT_EXIST:
+      return 'メッセージが見つかりません';
+    case DeleteResult.NOT_EXIST_DB:
+      return 'DBにメッセージがありません';
+    case DeleteResult.NOT_OWNER:
+      return 'あなたは送信者ではありません';
+    default:
+      return '更新に失敗しました';
+  }
+}
+
 interface MessageLogData {
   message_id: string;
   author_id:  string;
@@ -246,6 +315,11 @@ class DB {
 
   async removeMessageByMessageId(message_id: string, author_id: string): Promise<DeleteResult>{
     await util.promisify((c)=>this.sqlitedb.run('DELETE FROM messages WHERE message_id = ?', [message_id], c))();
+    return DeleteResult.SUCCESS;
+  }
+
+  async updateMessageByOriginalId(original_id: string, message: string, author_id: string): Promise<DeleteResult>{
+    await util.promisify((c)=>this.sqlitedb.run('UPDATE messages SET message = ? WHERE original_id = ?', [message, original_id], c))();
     return DeleteResult.SUCCESS;
   }
 
